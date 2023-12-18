@@ -1,10 +1,18 @@
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
+#include <pthread.h>
+#include <limits.h>
 
 #define BUFLEN 4096
-#define MAXSEEDS 100 //just guessing
+#define MAXSEEDS 24 // make this an even number
+#define MAXTHREADS MAXSEEDS / 2
 
+pthread_mutex_t mutex;
+long globalMinLocation = LONG_MAX;
+
+long globalMapMin = LONG_MAX;
+long globalMapMax = 0;
 
 typedef struct MapRange {
     long start;
@@ -17,6 +25,12 @@ typedef struct Map {
     int rangeCount;
     struct Map *nextMap;
 } Map;
+
+typedef struct {
+    long start;
+    long end;
+    Map *map;
+} ThreadData;
 
 
 void getVals(long *dest, long *source, long *range, char *row) {
@@ -55,7 +69,11 @@ void populateRanges(FILE *fp, Map *map) {
         }
         getVals(&dest, &source, &range, buf);
         map->ranges[i].start = source;
+        if (source < globalMapMin)
+            globalMapMin = source;
         map->ranges[i].end = source + range - 1;
+        if (source + range -1 > globalMapMax)
+            globalMapMax = source + range - 1;
         map->ranges[i].offset = dest - source;
         //printf("start: %ld, end: %ld; offset: %ld\n", map->ranges[i].start, map->ranges[i].end, map->ranges[i].offset);
         i++;
@@ -68,6 +86,7 @@ long translate(Map *map, long source) {
     for (int i = 0; i < map->rangeCount; i++) {
         if (map->ranges[i].start <= source && map->ranges[i].end >= source) {
             translated = source + map->ranges[i].offset;
+            break;
         }
     }
     //printf("translated: %ld\n", translated);
@@ -83,6 +102,30 @@ long getLocation(long sval, Map *sMap) {
     }
     sval = translate(sMap, sval);
     return sval;
+}
+
+void *processSeedPair(void *arg) {
+    ThreadData *data = (ThreadData *)arg;
+    long localMin = LONG_MAX;
+
+    for (long j = data->start; j < data->start + data->end; j++) {
+        long result = j;
+        if (j >= globalMapMin && j <= globalMapMax) {
+            result = getLocation(j, data->map);
+        }
+        if (labs(result) < localMin) {
+            localMin = labs(result);
+        }
+    }
+
+    pthread_mutex_lock(&mutex);
+    if (localMin < globalMinLocation) {
+        globalMinLocation = localMin;
+    }
+    pthread_mutex_unlock(&mutex);
+    //printf("localmin for %ld to %ld is %ld\n", data->start, data->end, localMin);
+    free(data);
+    pthread_exit(NULL);
 }
 
 int main(int argc, char *argv[]) {
@@ -199,21 +242,31 @@ int main(int argc, char *argv[]) {
         }
     }
 
-    int i = 0;
-    long minLocation = INT64_MAX;
-    while (seeds[i] != 0) {
-        for (long j = seeds[i]; j < seeds[i] + seeds[i+1]; j++) {
-            long result = 0;
-            //printf("seed: %ld\n", j);
-            result = getLocation(j, seedToSoilMap);
-            if (abs( (int) result) < minLocation) {
-                minLocation = abs( (int)result);
-            }
+    pthread_t threads[MAXTHREADS];
+    pthread_mutex_init(&mutex, NULL);
+    int threadIndex = 0;
+
+    for (int i = 0; seeds[i] != 0 && threadIndex < MAXTHREADS; i += 2) {
+        ThreadData *data = malloc(sizeof(ThreadData));
+        data->start = seeds[i];
+        data->end = seeds[i + 1];
+        data->map = seedToSoilMap;
+
+        if (pthread_create(&threads[threadIndex], NULL, processSeedPair, data) != 0) {
+            perror("Failed to create thread");
+            free(data);
+            continue;
         }
-        //printf("location for %ld is %ld\n", seeds[i], result);
-        i += 2;
+        threadIndex++;
     }
-    printf("min is %ld\n", minLocation);
+
+    for (int i = 0; i < threadIndex; i++) {
+        pthread_join(threads[i], NULL);
+    }
+
+    printf("min is %ld\n", globalMinLocation);
+
+    pthread_mutex_destroy(&mutex);
     
     if (seeds != NULL)
         free(seeds);
