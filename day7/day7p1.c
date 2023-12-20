@@ -80,9 +80,9 @@ int compareHands(const void *a, const void *b) {
     }
     for (int i = 0; i < NUMCARDS; i++) {
         int delta = getCardValue(hand1->cards[i]) - getCardValue(hand2->cards[i]);
-        printf("comparing %c and %c...\n", hand1->cards[i], hand2->cards[i]);
+        //printf("comparing %c and %c...\n", hand1->cards[i], hand2->cards[i]);
         if (delta != 0) {
-            printf("returned %d\n", delta);
+            //printf("returned %d\n", delta);
             return delta;
         }
     }
@@ -132,7 +132,8 @@ int main(int argc, char *argv[]) {
     long total_winnings = 0;
     for (int i = 0; i < numLines; i++ ) {
         total_winnings += hands[i].bid * (i+1);
-        printf("hand %s, bid %d, label %d, running total %ld\n", hands[i].cards, hands[i].bid, hands[i].label, total_winnings);
+        printf("hand %s\n", hands[i].cards);
+        printf("  bid %d, label %d, rank %d, prize %d, running total %ld\n", hands[i].bid, hands[i].label, i+1, hands[i].bid * (i+1), total_winnings);
     }
     printf("total winnings: %ld\n", total_winnings);
 
