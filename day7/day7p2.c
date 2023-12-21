@@ -26,27 +26,40 @@ int getLabel (char *cards) {
     char counts[CHAR_MAX + 1] = {0};
     for (int i = 0; i < NUMCARDS; i++) {
         counts[(unsigned char)cards[i]]++;
-        if (counts[(unsigned char)cards[i]] == 5) {
-            return FIVE_OF_A_KIND;
-        }
+        if (counts[(unsigned char)cards[i]] == 5 ) {
+            return FIVE_OF_A_KIND; 
+        } 
     }
-    int pairs = 0, triples = 0;
+
+    int pairs = 0, triples = 0, quads = 0, jokers = counts[(unsigned char)'J'];
     for (int i = 0; i <= CHAR_MAX; i++) {
-        if (counts[i] == 4) {
-            return 5;
-        } else if (counts[i] == 2) {
-            pairs++;
-        } else if (counts[i] == 3) {
-            triples++;
-        }
+        if (i != (unsigned char)'J') {
+            switch(counts[i]) {
+                case 4: 
+                    quads++;
+                    break;
+                case 3: 
+                    triples++;
+                    break;
+                case 2: 
+                    pairs++;
+                    break;
+            }
+        } 
     }
-    if (pairs == 2) {
-        return TWO_PAIR;
-    } else if (pairs == 1 && triples == 1) {
+    //printf("cards: %s - pairs %d, triples %d, jokers: %d\n", cards, pairs, triples, jokers);
+
+    if ( (quads == 1 && jokers == 1) || (triples == 1 && jokers == 2) || (pairs == 1 && jokers == 3) || jokers == 4) {
+        return FIVE_OF_A_KIND;
+    } else if ( quads == 1 || (triples == 1 && jokers == 1) || (pairs == 1 && jokers == 2) || jokers == 3) {
+        return FOUR_OF_A_KIND;
+    } else if ( pairs == 2 && jokers == 1 || (triples == 1 && pairs == 1 ))  {
         return FULL_HOUSE;
-    } else if (triples == 1) {
+    } else if (triples == 1 || (pairs == 1 && jokers == 1) || jokers == 2) {
         return THREE_OF_A_KIND;
-    } else if (pairs == 1) {
+    } else if (pairs == 2 ) {
+        return TWO_PAIR;
+    } else if (pairs == 1 || jokers == 1) {
         return ONE_PAIR;
     }
     return NOTHING;
@@ -57,7 +70,7 @@ int getCardValue(char c) {
         case 'A': return 14;
         case 'K': return 13;
         case 'Q': return 12;
-        case 'J': return 11;
+        case 'J': return 0;
         case 'T': return 10;
         default:  return c - '0';
     }
@@ -120,6 +133,10 @@ int main(int argc, char *argv[]) {
             hands[i].cards = cards;
             hands[i].bid = bid;
             hands[i].label = getLabel(hands[i].cards);
+            if (strncmp("JJJJ8", hands[i].cards, 5) == 0) {
+                //printf("label for JJJJ8 is = %d\n", hands[i].label);
+            }
+            //printf("label for %s is %d\n", hands[i].cards, hands[i].label);
             i++;
         }
     }
